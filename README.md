@@ -1,3 +1,4 @@
+```
 # cpanel
 Cpanel Plugin Development 
 
@@ -14,3 +15,4 @@ curl -O https://raw.githubusercontent.com/satyambaral/cpanel/main/uninstall_load
 chmod +x uninstall_loadwatch.sh
 bash uninstall_loadwatch.sh
 
+```
