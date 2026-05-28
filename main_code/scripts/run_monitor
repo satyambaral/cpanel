@@ -1,0 +1,4 @@
+#!/bin/bash
+# Hook to run monitor on demand
+
+/usr/local/cpanel/base/frontend/paper_lantern/load_monitor/scripts/monitor_load.pl
