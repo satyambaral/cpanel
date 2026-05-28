@@ -1,8 +1,9 @@
-```
+
 # cpanel
 Cpanel Plugin Development 
 
 #Loadwatch Plugin
+```
 #install
 
 curl -O https://raw.githubusercontent.com/satyambaral/cpanel/main/auto_install_loadwatch.sh
