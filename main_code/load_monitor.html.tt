@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Load Monitor - cPanel Plugin</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <link href="/cPanel/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-ok { color: green; font-weight: bold; }
+        .status-warning { color: orange; font-weight: bold; }
+        .status-critical { color: red; font-weight: bold; }
+        .container { margin: 20px; }
+        .panel { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="page-header">
+            <h1>Server Load Monitor</h1>
+            <p>Monitor and manage server load thresholds</p>
+        </div>
+        
+        [% IF cgi.param('saved') %]
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+            Settings saved successfully!
+        </div>
+        [% END %]
+        
+        <!-- Current Status Panel -->
+        <div class="panel panel-info">
+            <div class="panel-heading">
+                <h3 class="panel-title">Current Server Status</h3>
+            </div>
+            <div class="panel-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Current Load Average:</strong> 
+                        <span id="current-load">[% status.current_load %]</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Status:</strong>
+                        <span id="status-message" class="
+                            [% IF status.status_message == 'CRITICAL: High load detected!' %]status-critical
+                            [% ELSIF status.status_message == 'WARNING: Load is elevated' %]status-warning
+                            [% ELSE %]status-ok[% END %]
+                        ">
+                            [% status.status_message %]
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Configuration Panel -->
+        <div class="panel panel-primary">
+            <div class="panel-heading">
+                <h3 class="panel-title">Monitor Configuration</h3>
+            </div>
+            <div class="panel-body">
+                <form method="post" action="load_monitor.cgi" class="form-horizontal">
+                    <input type="hidden" name="action" value="save">
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Enable Monitor:</label>
+                        <div class="col-sm-8">
+                            <input type="checkbox" name="monitor_enabled" value="1" 
+                                   [% IF settings.monitor_enabled %]checked[% END %]>
+                            <span class="help-block">Enable automatic load monitoring</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Load Threshold (%):</label>
+                        <div class="col-sm-8">
+                            <input type="number" name="load_threshold" 
+                                   value="[% settings.load_threshold %]" 
+                                   class="form-control" min="1" max="1000" required>
+                            <span class="help-block">CPU load average threshold</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Time Duration (minutes):</label>
+                        <div class="col-sm-8">
+                            <input type="number" name="time_duration" 
+                                   value="[% settings.time_duration %]" 
+                                   class="form-control" min="1" required>
+                            <span class="help-block">How long load must exceed threshold before action</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Action to Take:</label>
+                        <div class="col-sm-8">
+                            <select name="action_type" class="form-control">
+                                <option value="email" [% IF settings.action == 'email' %]selected[% END %]>
+                                    Send Email Alert
+                                </option>
+                                <option value="restart_apache" [% IF settings.action == 'restart_apache' %]selected[% END %]>
+                                    Restart Apache
+                                </option>
+                                <option value="restart_mysql" [% IF settings.action == 'restart_mysql' %]selected[% END %]>
+                                    Restart MySQL
+                                </option>
+                                <option value="both" [% IF settings.action == 'both' %]selected[% END %]>
+                                    Send Email & Restart Services
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Email Address:</label>
+                        <div class="col-sm-8">
+                            <input type="email" name="email" 
+                                   value="[% settings.email %]" 
+                                   class="form-control">
+                            <span class="help-block">Where to send alert emails</span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="col-sm-4 control-label">Check Interval (minutes):</label>
+                        <div class="col-sm-8">
+                            <input type="number" name="check_interval" 
+                                   value="[% settings.check_interval %]" 
+                                   class="form-control" min="1" max="60">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <div class="col-sm-offset-4 col-sm-8">
+                            <button type="submit" class="btn btn-primary">Save Configuration</button>
+                            <button type="button" class="btn btn-warning" onclick="refreshStatus()">
+                                Refresh Status
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Manual Actions Panel -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">Manual Actions</h3>
+            </div>
+            <div class="panel-body">
+                <button onclick="manualAction('restart_apache')" class="btn btn-danger">
+                    Restart Apache
+                </button>
+                <button onclick="manualAction('restart_mysql')" class="btn btn-danger">
+                    Restart MySQL
+                </button>
+                <button onclick="manualAction('send_email')" class="btn btn-warning">
+                    Send Test Email
+                </button>
+            </div>
+        </div>
+        
+        <!-- Monitor Log -->
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h3 class="panel-title">Recent Activity Log</h3>
+            </div>
+            <div class="panel-body">
+                <pre id="log-content">Loading...</pre>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/cPanel/js/jquery.min.js"></script>
+    <script>
+        function refreshStatus() {
+            $.get('load_monitor.cgi?action=get_status', function(data) {
+                $('#current-load').text(data.current_load);
+                var statusClass = '';
+                if (data.status_message.indexOf('CRITICAL') >= 0) {
+                    statusClass = 'status-critical';
+                } else if (data.status_message.indexOf('WARNING') >= 0) {
+                    statusClass = 'status-warning';
+                } else {
+                    statusClass = 'status-ok';
+                }
+                $('#status-message').removeClass('status-critical status-warning status-ok').addClass(statusClass);
+                $('#status-message').text(data.status_message);
+            });
+        }
+        
+        function manualAction(action) {
+            if (confirm('Are you sure you want to perform this action?')) {
+                $.get('load_monitor.cgi?action=manual_action&action_type=' + action, function(data) {
+                    alert(data);
+                    refreshStatus();
+                });
+            }
+        }
+        
+        function loadLog() {
+            $.get('/var/log/load_monitor.log', function(data) {
+                $('#log-content').text(data);
+            }).fail(function() {
+                $('#log-content').text('No log file found');
+            });
+        }
+        
+        $(document).ready(function() {
+            loadLog();
+            setInterval(refreshStatus, 30000);
+            setInterval(loadLog, 60000);
+        });
+    </script>
+</body>
+</html>
